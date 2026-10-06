@@ -18,21 +18,30 @@ El proyecto utiliza un modelo Pydantic para validar la información de cada estu
 
 ```python
 class Estudiante(BaseModel):
+    id: int
     nombre: str
     edad: int
     programa: str
 ```
 
-Cada estudiante debe tener un nombre de texto, una edad numérica y el nombre de un programa académico.
+Cada estudiante debe tener un identificador numérico (`id`), un nombre de texto, una edad numérica y el nombre de un programa académico.
 
-Los estudiantes se guardan en la variable `dataset_estudiantes`, que es una lista principal. Cada estudiante se representa como una lista secundaria:
+Los estudiantes se guardan en la variable `dataset_estudiantes`, que es una lista principal. Cada estudiante se representa como una lista secundaria con la siguiente estructura:
 
 ```python
 dataset_estudiantes = [
-    ["Ana Gómez", 20, "Ingeniería de Sistemas"],
-    ["Carlos Pérez", 22, "Diseño Industrial"]
+    [1, "Ana Gómez", 20, "Ingeniería de Sistemas"],
+    [2, "Carlos Pérez", 22, "Diseño Industrial"]
 ]
 ```
+
+El primer elemento de cada registro corresponde al identificador del estudiante:
+
+```text
+[id, nombre, edad, programa]
+```
+
+El identificador permite localizar directamente a un estudiante sin depender de la posición que ocupa dentro del dataset.
 
 Esta información se almacena únicamente en memoria. Por lo tanto, se pierde cuando se detiene o reinicia el servidor.
 
@@ -42,7 +51,9 @@ Active el entorno virtual e instale las dependencias:
 
 ```bash
 python3 -m venv venv
+
 source venv/bin/activate
+
 pip install -r requirements.txt
 ```
 
@@ -50,7 +61,9 @@ En Windows puede utilizar:
 
 ```bash
 python -m venv venv
+
 venv\Scripts\activate
+
 pip install -r requirements.txt
 ```
 
@@ -60,7 +73,11 @@ Ejecute la aplicación con Uvicorn:
 uvicorn main:app --reload
 ```
 
-El servidor quedará disponible en `http://127.0.0.1:8000`.
+El servidor quedará disponible en:
+
+```text
+http://127.0.0.1:8000
+```
 
 ## Documentación Swagger
 
@@ -100,16 +117,17 @@ Ejemplo de solicitud:
 
 ```json
 {
-  "nombre": "Ana Gómez",
-  "edad": 20,
-  "programa": "Ingeniería de Sistemas"
+  "id": 1,
+  "nombre": "Juan Carlos",
+  "edad": 25,
+  "programa": "Desarrollo de Software"
 }
 ```
 
 Internamente, el estudiante se convierte en una lista y se agrega al dataset:
 
 ```text
-["Ana Gómez", 20, "Ingeniería de Sistemas"]
+[1, "Juan Carlos", 25, "Desarrollo de Software"]
 ```
 
 Respuesta esperada:
@@ -117,14 +135,77 @@ Respuesta esperada:
 ```json
 {
   "message": "Estudiante agregado correctamente",
-  "estudiante": ["Ana Gómez", 20, "Ingeniería de Sistemas"],
+  "estudiante": [
+    1,
+    "Juan Carlos",
+    25,
+    "Desarrollo de Software"
+  ],
   "dataset": [
-    ["Ana Gómez", 20, "Ingeniería de Sistemas"]
+    [
+      1,
+      "Juan Carlos",
+      25,
+      "Desarrollo de Software"
+    ]
   ]
 }
 ```
 
 Cada vez que se ejecuta el POST, el dataset completo también se imprime en la consola del servidor.
+
+### GET `/estudiantes/{id}`
+
+Permite consultar un estudiante específico utilizando su identificador (`id`).
+
+El endpoint recorre el dataset y compara el `id` recibido en la URL con el primer elemento de cada registro. Si encuentra una coincidencia, retorna únicamente el estudiante solicitado.
+
+Ejemplo de solicitud:
+
+```text
+GET /estudiantes/1
+```
+
+Para consultar al estudiante con ID `1`, desde Swagger se utiliza:
+
+```text
+id = 1
+```
+
+Respuesta para un estudiante existente:
+
+```json
+{
+  "estudiante": [
+    1,
+    "Juan Carlos",
+    25,
+    "Desarrollo de Software"
+  ]
+}
+```
+
+Si el ID solicitado no existe en el dataset, la API responde:
+
+```json
+{
+  "message": "Estudiante no encontrado"
+}
+```
+
+Por ejemplo, al consultar:
+
+```text
+GET /estudiantes/999
+```
+
+se obtiene:
+
+```json
+{
+  "message": "Estudiante no encontrado"
+}
+```
 
 ### PUT `/estudiantes/{indice}`
 
@@ -140,13 +221,14 @@ Cuerpo de la solicitud:
 
 ```json
 {
+  "id": 1,
   "nombre": "Ana Rodríguez",
   "edad": 21,
   "programa": "Ingeniería de Software"
 }
 ```
 
-El PUT exige los tres campos y reemplaza completamente la lista que se encuentra en la posición indicada.
+El PUT exige todos los campos del modelo `Estudiante` y reemplaza completamente la información del estudiante ubicado en la posición indicada.
 
 ### PATCH `/estudiantes/{indice}`
 
@@ -191,7 +273,7 @@ La lista se elimina del dataset y los estudiantes que estaban después de ella o
 
 ## Validación y errores
 
-Pydantic valida automáticamente los datos recibidos. Por ejemplo, `edad` debe ser un número entero y los campos de texto deben enviarse como cadenas.
+Pydantic valida automáticamente los datos recibidos. Por ejemplo, `id` y `edad` deben ser números enteros y los campos de texto deben enviarse como cadenas.
 
 Si se utiliza un índice que no existe, la API responde:
 
@@ -201,17 +283,26 @@ Si se utiliza un índice que no existe, la API responde:
 }
 ```
 
+Si se consulta un ID que no existe mediante `GET /estudiantes/{id}`, la API responde:
+
+```json
+{
+  "message": "Estudiante no encontrado"
+}
+```
+
 Después de cada POST, PUT, PATCH o DELETE, el contenido actualizado del dataset se imprime en la consola del servidor.
 
 ## Resumen de operaciones
 
-| Método | Ruta | Función |
-|---|---|---|
-| GET | `/` | Verificar que el servidor funciona |
-| POST | `/estudiantes` | Agregar un estudiante |
-| PUT | `/estudiantes/{indice}` | Reemplazar todos los datos |
-| PATCH | `/estudiantes/{indice}` | Actualizar algunos datos |
-| DELETE | `/estudiantes/{indice}` | Eliminar un estudiante |
+| Método | Ruta                    | Función                            |
+| ------ | ----------------------- | ---------------------------------- |
+| GET    | `/`                     | Verificar que el servidor funciona |
+| POST   | `/estudiantes`          | Agregar un estudiante              |
+| GET    | `/estudiantes/{id}`     | Consultar un estudiante por su ID  |
+| PUT    | `/estudiantes/{indice}` | Reemplazar todos los datos         |
+| PATCH  | `/estudiantes/{indice}` | Actualizar algunos datos           |
+| DELETE | `/estudiantes/{indice}` | Eliminar un estudiante             |
 
 ## Actividad propuesta
 
@@ -223,5 +314,42 @@ Amplíe la API para consultar un estudiante por su identificador.
 4. Pruebe la operación desde Swagger UI con estudiantes existentes y con un ID que no exista.
 5. Documente el nuevo endpoint en el README.
 6. Publique los cambios en su repositorio de la clase.
+
+### Pruebas realizadas
+
+Se probó el endpoint con un estudiante existente:
+
+```text
+GET /estudiantes/1
+```
+
+Resultado:
+
+```json
+{
+  "estudiante": [
+    1,
+    "Juan Carlos",
+    25,
+    "Desarrollo de Software"
+  ]
+}
+```
+
+También se probó con un ID inexistente:
+
+```text
+GET /estudiantes/999
+```
+
+Resultado:
+
+```json
+{
+  "message": "Estudiante no encontrado"
+}
+```
+
+Estas pruebas permiten verificar tanto el funcionamiento correcto de la búsqueda por identificador como el manejo de estudiantes que no existen.
 
 La respuesta para un ID existente debe incluir los datos del estudiante. Para un ID inexistente, la API debe responder un mensaje indicando que el estudiante no fue encontrado.

@@ -1,13 +1,16 @@
+
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 
 
 app = FastAPI()
+
 dataset_estudiantes: list[list] = []
 
 
 class Estudiante(BaseModel):
+    id: int
     nombre: str
     edad: int
     programa: str
@@ -21,10 +24,12 @@ def read_root():
 @app.post("/estudiantes")
 def agregar_estudiante(estudiante: Estudiante):
     estudiante_como_lista = [
+        estudiante.id,
         estudiante.nombre,
         estudiante.edad,
         estudiante.programa,
     ]
+
     dataset_estudiantes.append(estudiante_como_lista)
 
     print("Dataset de estudiantes:")
@@ -35,6 +40,19 @@ def agregar_estudiante(estudiante: Estudiante):
         "message": "Estudiante agregado correctamente",
         "estudiante": estudiante_como_lista,
         "dataset": dataset_estudiantes,
+    }
+
+
+@app.get("/estudiantes/{id}")
+def obtener_estudiante(id: int):
+    for estudiante in dataset_estudiantes:
+        if estudiante[0] == id:
+            return {
+                "estudiante": estudiante
+            }
+
+    return {
+        "message": "Estudiante no encontrado"
     }
 
 
@@ -55,11 +73,15 @@ def reemplazar_estudiante(indice: int, estudiante: Estudiante):
     if indice < 0 or indice >= len(dataset_estudiantes):
         return {"error": "El estudiante no existe"}
 
+    id_original = dataset_estudiantes[indice][0]
+
     dataset_estudiantes[indice] = [
+        id_original,
         estudiante.nombre,
         estudiante.edad,
         estudiante.programa,
     ]
+
     imprimir_dataset()
 
     return {
@@ -77,7 +99,12 @@ def actualizar_estudiante_parcial(
         return {"error": "El estudiante no existe"}
 
     datos_actualizados = estudiante.model_dump(exclude_unset=True)
-    campos = {"nombre": 0, "edad": 1, "programa": 2}
+
+    campos = {
+        "nombre": 1,
+        "edad": 2,
+        "programa": 3,
+    }
 
     for campo, valor in datos_actualizados.items():
         dataset_estudiantes[indice][campos[campo]] = valor
@@ -97,6 +124,7 @@ def eliminar_estudiante(indice: int):
         return {"error": "El estudiante no existe"}
 
     estudiante_eliminado = dataset_estudiantes.pop(indice)
+
     imprimir_dataset()
 
     return {
